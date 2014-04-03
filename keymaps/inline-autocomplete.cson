@@ -1,0 +1,4 @@
+'.editor':
+  'escape': 'inline-autocomplete:cycle'
+'.inline-autocompleting':
+  'space': 'inline-autocomplete:stop'
