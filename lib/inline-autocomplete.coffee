@@ -4,6 +4,7 @@ _ = require 'underscore-plus'
 module.exports =
   configDefaults:
     includeCompletionsFromAllBuffers: false
+    includeGrammarKeywords: false
     regexFlags: ""
     confirmKeys: [8, 9, 13, 37, 38, 39, 40, 46, 91, 186, 188, 190, 191, 192, 219, 220, 221, 222]
 
@@ -56,6 +57,16 @@ module.exports =
     else
       buffers = [@currentBuffer]
     matches = []
+    # Really goddamn ugly code here, it just strips out the match string of special characters
+    # It's probably pretty damn inefficent and unreliable
+    if atom.config.get('inline-autocomplete.includeGrammarKeywords')
+      grammar = atom.workspaceView.getActiveView().getEditor().getGrammar()
+      for rawPattern in grammar.rawPatterns
+        if rawPattern.match
+          strippedPattern = rawPattern.match.replace(/\\.{1}/g, '')
+          if words = strippedPattern.match(/\w+/g)
+            matches.push(word.match(@wordRegex)) if word.match(@wordRegex) for word in words
+    
     matches.push(buffer.getText().match(@wordRegex)) for buffer in buffers
     wordHash[word] ?= true for word in _.flatten(matches)
     wordHash[word] ?= true for word in @getCompletionsForCursorScope()
