@@ -12,13 +12,13 @@ Looking to use a different keybinding? Copy the following to your
   'alt-space': 'inline-autocomplete:cycle'
 ```
 
-For now, to set the keybind to confirm selection:
+You can add a keybind to confirm a selection:
 ```
 '.inline-autocompleting':
   'space': 'inline-autocomplete:stop'
 ```
-Or you can click in the editor.
 
 TODO:
- * Don't require a keybinding to cancel autocomplete. Maybe make editorView that listens for whitespace keys.
+ * Pull Editor's grammar to Word List
+ * Figure out how to make confirmKeys customizable
  

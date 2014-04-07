@@ -5,6 +5,7 @@ module.exports =
   configDefaults:
     includeCompletionsFromAllBuffers: false
     regexFlags: ""
+    confirmKeys: [8, 9, 13, 37, 38, 39, 40, 46, 91, 186, 188, 190, 191, 192, 219, 220, 221, 222]
 
   wordRegex      : /\w+/g
   wordList       : null
@@ -15,6 +16,12 @@ module.exports =
   editorView     : null
   
   activate: ->
+    # Should I cache this or will coffeescript do it for me?
+    confirmKeys = atom.config.get('inline-autocomplete.confirmKeys')
+    atom.workspaceView.eachEditorView (editorView) =>
+      editorView.on 'keydown', (e) =>
+        @reset() if (e.keyCode in confirmKeys) and editorView and editorView.hasClass('inline-autocompleting')
+      
     atom.workspaceView.on 'click', (e) =>
       @reset() if @editorView? and @editorView.hasClass('inline-autocompleting')
     atom.workspaceView.command 'inline-autocomplete:stop', (e) =>
