@@ -10,6 +10,7 @@ Looking to use a different keybinding? Copy the following to your
 ```
 '.editor':
   'alt-space': 'inline-autocomplete:cycle'
+  'shift-alt-space': 'inline-autocomplete:cycle-back'
 ```
 
 You can add a keybind to confirm a selection:

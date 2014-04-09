@@ -10,7 +10,7 @@ module.exports =
 
   wordRegex      : /\w+/g
   wordList       : null
-  currentWordPos : 0
+  currentWordPos : -1     # offset for 0-bases array
   currentMatches : null
   editor         : null
   currentBuffer  : null
@@ -28,27 +28,33 @@ module.exports =
     atom.workspaceView.command 'inline-autocomplete:stop', (e) =>
       @reset()
     
+    atom.workspaceView.command 'inline-autocomplete:cycle-back', (e) => 
+      @toggleAutocomplete(e, -1)
+    
     atom.workspaceView.command 'inline-autocomplete:cycle', (e) => 
-      @editor = atom.workspace.getActiveEditor()
-      if @editor?
-        @currentBuffer = @editor.getBuffer()
-        @editorView = atom.workspaceView.getActiveView()
-        cursor = @editor.getCursor()
-        cursorPosition = @editor.getCursorBufferPosition()
-        
-        if @editorView.editor? and
-        @editorView.isFocused and 
-        cursor.isVisible() and
-        @currentBuffer.getTextInRange( Range.fromPointWithDelta(cursorPosition,0,-1)).match(/^\w$/) and
-        @currentBuffer.getTextInRange( Range.fromPointWithDelta(cursorPosition,0,1)).match(/^\W*$/)
-          @editorView.addClass('inline-autocompleting')
-          @cycleAutocompleteWords()
-        else
-          @reset()
-          e.abortKeyBinding()
+      @toggleAutocomplete(e, 1)
+  
+  toggleAutocomplete: (e, step) -> 
+    @editor = atom.workspace.getActiveEditor()
+    if @editor?
+      @currentBuffer = @editor.getBuffer()
+      @editorView = atom.workspaceView.getActiveView()
+      cursor = @editor.getCursor()
+      cursorPosition = @editor.getCursorBufferPosition()
+      
+      if @editorView.editor? and
+      @editorView.isFocused and 
+      cursor.isVisible() and
+      @currentBuffer.getTextInRange( Range.fromPointWithDelta(cursorPosition,0,-1)).match(/^\w$/) and
+      @currentBuffer.getTextInRange( Range.fromPointWithDelta(cursorPosition,0,1)).match(/^\W*$/)
+        @editorView.addClass('inline-autocompleting')
+        @cycleAutocompleteWords(step)
       else
         @reset()
         e.abortKeyBinding()
+    else
+      @reset()
+      e.abortKeyBinding()
   
   buildWordList: ->
     wordHash = {}
@@ -117,7 +123,7 @@ module.exports =
     else
       {word, prefix, suffix} for word in @wordList
   
-  cycleAutocompleteWords: ->
+  cycleAutocompleteWords: (steps)->
     unless @wordList?
       @buildWordList()
     
@@ -125,16 +131,19 @@ module.exports =
       @currentMatches = @findMatchesForCurrentSelection()
     
     if @currentMatches.length > 0
-      @replaceSelectedTextWithMatch(@currentMatches[@currentWordPos])
-      @currentWordPos++
+      if steps + @currentWordPos < 0
+        @currentWordPos = @currentMatches.length + steps
+      else
+        @currentWordPos += steps
       @currentWordPos %= @currentMatches.length
+      @replaceSelectedTextWithMatch(@currentMatches[@currentWordPos])
     # if @currentWordPos >= @currentMatches.length
     #   @reset()
 
   reset: ->
     @editorView.removeClass('inline-autocompleting') if @editorView
     @wordList       = null
-    @currentWordPos = 0
+    @currentWordPos = -1
     @currentMatches = null
     @currentBuffer  = null
     @editorView     = null
