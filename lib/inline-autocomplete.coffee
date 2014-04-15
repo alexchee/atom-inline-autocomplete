@@ -6,7 +6,7 @@ module.exports =
     includeCompletionsFromAllBuffers: false
     includeGrammarKeywords: false
     regexFlags: ""
-    confirmKeys: [8, 9, 13, 37, 38, 39, 40, 46, 91, 186, 188, 190, 191, 192, 219, 220, 221, 222]
+    confirmKeys: [8, 9, 13, 32, 37, 38, 39, 40, 46, 48, 49, 50, 51, 57, 91, 186, 188, 190, 191, 192, 219, 220, 221, 222]
 
   wordRegex      : /\w+/g
   wordList       : null
