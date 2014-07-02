@@ -67,12 +67,13 @@ module.exports =
     # It's probably pretty damn inefficent and unreliable
     if atom.config.get('inline-autocomplete.includeGrammarKeywords')
       grammar = atom.workspaceView.getActiveView().getEditor().getGrammar()
-      for rawPattern in grammar.rawPatterns
-        if rawPattern.match
-          strippedPattern = rawPattern.match.replace(/\\.{1}/g, '')
-          if words = strippedPattern.match(/\w+/g)
-            matches.push(word.match(@wordRegex)) if word.match(@wordRegex) for word in words
-    
+      if grammar and grammar.rawPatterns
+        for rawPattern in grammar.rawPatterns
+          if rawPattern.match
+            strippedPattern = rawPattern.match.replace(/\\.{1}/g, '')
+            if words = strippedPattern.match(/\w+/g)
+              matches.push(word.match(@wordRegex)) if word.match(@wordRegex) for word in words
+      
     matches.push(buffer.getText().match(@wordRegex)) for buffer in buffers
     wordHash[word] ?= true for word in _.flatten(matches)
     wordHash[word] ?= true for word in @getCompletionsForCursorScope()
