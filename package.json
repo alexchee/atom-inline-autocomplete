@@ -5,7 +5,7 @@
   "description": "Inserts possible completions in the editor with `escape`, Textmate style.",
   "repository": "https://github.com/alexchee/atom-inline-autocomplete",
   "engines": {
-    "atom": ">=0.x.0, <2.0.0"
+    "atom": ">=0.0.x <2.0.0"
   },
   "dependencies": {
     "underscore-plus": "1.x",
