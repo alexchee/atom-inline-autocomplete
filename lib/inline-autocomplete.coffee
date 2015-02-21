@@ -7,7 +7,7 @@ module.exports =
     includeCompletionsFromAllBuffers: false
     includeGrammarKeywords: false
     regexFlags: ""
-    confirmKeys: [8, 9, 13, 32, 37, 38, 39, 40, 46, 48, 49, 50, 51, 57, 91, 186, 188, 190, 191, 192, 219, 220, 221, 222]
+    confirmKeys: [8, 9, 13, 27, 32, 37, 38, 39, 40, 46, 48, 49, 50, 51, 57, 91, 186, 188, 190, 191, 192, 219, 220, 221, 222]
 
   wordRegex      : /[\w\-_]+/g
   wordList       : null
@@ -19,7 +19,7 @@ module.exports =
   
   activate: ->
     # Should I cache this or will coffeescript do it for me?
-    confirmKeys = atom.config.get('inline-autocomplete.confirmKeys')
+    confirmKeys = @updateConfirmKeys atom.config.get('inline-autocomplete.confirmKeys')
     atom.workspace.observeTextEditors (editor) =>
       editorView = atom.views.getView editor
       editorView.onkeydown = (e) =>
@@ -36,6 +36,17 @@ module.exports =
     
     atom.commands.add 'atom-workspace', 'inline-autocomplete:cycle', (e) => 
       @toggleAutocomplete(e, 1)
+  
+  # Removes any already binded keys
+  # TODO: figure out a better way to handle this for keys with modifiers
+  updateConfirmKeys: (confirmKeys) =>
+    for key, confirmKey of confirmKeys
+      keyEvent = atom.keymap.constructor.buildKeydownEvent(String.fromCharCode(confirmKey))
+      keyName = atom.keymap.constructor.prototype.keystrokeForKeyboardEvent(keyEvent)
+      
+      confirmKeys.splice(key, 1) if atom.keymap.findKeyBindings({'command': 'inline-autocomplete:cycle', 'keystrokes': keyName}).length > 0
+      confirmKeys.splice(key, 1) if atom.keymap.findKeyBindings({'command': 'inline-autocomplete:cycle-back', 'keystrokes': keyName}).length > 0
+    confirmKeys
   
   toggleAutocomplete: (e, step) -> 
     @editor = atom.workspace.getActiveTextEditor()
