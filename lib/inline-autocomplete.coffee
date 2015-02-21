@@ -77,7 +77,6 @@ module.exports =
       
     matches.push(buffer.getText().match(@wordRegex)) for buffer in buffers
     wordHash[word] ?= true for word in _.flatten(matches)
-    wordHash[word] ?= true for word in @getCompletionsForCursorScope()
 
     @wordList = Object.keys(wordHash).sort (word1, word2) ->
       word1.toLowerCase().localeCompare(word2.toLowerCase())
@@ -107,11 +106,6 @@ module.exports =
         suffix = match[0][suffixOffset..] if range.end.isGreaterThan(selectionRange.end)
 
     {prefix, suffix}
-
-  getCompletionsForCursorScope: ->
-    completions = atom.config.getAll('editor.completions')
-    completions = completions.map (properties) -> _.valueForKeyPath(properties, 'editor.completions')
-    _.uniq(_.flatten(completions))
 
   findMatchesForCurrentSelection: ->
     selection = @editor.getSelection()
