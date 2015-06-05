@@ -49,11 +49,11 @@ module.exports =
   # TODO: figure out a better way to handle this for keys with modifiers
   updateConfirmKeys: (confirmKeys) =>
     for key, confirmKey of confirmKeys
-      keyEvent = atom.keymap.constructor.buildKeydownEvent(String.fromCharCode(confirmKey))
-      keyName = atom.keymap.constructor.prototype.keystrokeForKeyboardEvent(keyEvent)
+      keyEvent = atom.keymaps.constructor.buildKeydownEvent(String.fromCharCode(confirmKey))
+      keyName = atom.keymaps.constructor.prototype.keystrokeForKeyboardEvent(keyEvent)
 
-      confirmKeys.splice(key, 1) if atom.keymap.findKeyBindings({'command': 'inline-autocomplete:cycle', 'keystrokes': keyName}).length > 0
-      confirmKeys.splice(key, 1) if atom.keymap.findKeyBindings({'command': 'inline-autocomplete:cycle-back', 'keystrokes': keyName}).length > 0
+      confirmKeys.splice(key, 1) if atom.keymaps.findKeyBindings({'command': 'inline-autocomplete:cycle', 'keystrokes': keyName}).length > 0
+      confirmKeys.splice(key, 1) if atom.keymaps.findKeyBindings({'command': 'inline-autocomplete:cycle-back', 'keystrokes': keyName}).length > 0
     confirmKeys
 
   toggleAutocomplete: (e, step) ->
