@@ -110,7 +110,7 @@ module.exports =
       if grammar and grammar.rawPatterns
         for rawPattern in grammar.rawPatterns
           if rawPattern.match
-            strippedPattern = rawPattern.match.replace(/\\.{1}/g, '')
+            strippedPattern = rawPattern.match.replace(/\\.{2}/g, '')
             matches = strippedPattern.match(@wordRegex)
             continue unless matches?
             for word in matches
