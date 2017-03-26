@@ -35,7 +35,7 @@ module.exports =
     @deactivationDisposables.add atom.workspace.observeTextEditors (editor) =>
       editorView = atom.views.getView editor
       editorView.onkeydown = (e) =>
-        @reset() if (e.keyCode in confirmKeys) and editorView and editorView.classList.contains('inline-autocompleting')
+        @reset() unless (e.keyCode in confirmKeys) and editorView and editorView.classList.contains('inline-autocompleting')
 
       disposable = new Disposable => @reset()
       @deactivationDisposables.add editor.onDidDestroy -> disposable.dispose()
@@ -157,7 +157,7 @@ module.exports =
         true
       )
 
-      {prefix, suffix, word}  for {word} in closestWords when regex.test(word) and word != currentWord.word
+      {prefix, suffix, word} for {word} in closestWords when regex.test(word) and word != currentWord.word
     else
       {word, prefix, suffix} for {word} in @wordList
 
