@@ -5,6 +5,9 @@ WordNode = require './word-node'
 
 module.exports =
   config:
+    suggestClosest:
+      type: 'boolean'
+      default: false
     includeCompletionsFromAllBuffers:
       type: 'boolean'
       default: false
@@ -88,8 +91,20 @@ module.exports =
       @reset()
       e.abortKeyBinding()
 
+  initalizeList: ->
+    if atom.config.get('inline-autocomplete.suggestClosest')
+      @wordList = []
+    else
+      @wordList = new Set()
+
+  addWord: (word, buffer, row) ->
+    if atom.config.get('inline-autocomplete.suggestClosest')
+      @wordList.push(new WordNode {word: word, buffer: buffer, row: row+1})
+    else
+      @wordList.add(word)
+
   buildWordList: ->
-    @wordList = []
+    @initalizeList()
     if atom.config.get('inline-autocomplete.includeCompletionsFromAllBuffers')
       buffers = atom.project.getBuffers()
     else
@@ -97,11 +112,10 @@ module.exports =
 
     for buffer in buffers
       for line, row in buffer.getLines()
-        wl = @wordList
         matches = line.match(@wordRegex)
         continue unless matches?
         for validWord in matches
-          @wordList.push(new WordNode {word: validWord, buffer: buffer, row: row+1})
+          @addWord(validWord, buffer, row)
 
     # Really goddamn ugly code here, it just strips out the match string of special characters
     # It's probably pretty damn inefficent and unreliable
@@ -114,8 +128,7 @@ module.exports =
             matches = strippedPattern.match(@wordRegex)
             continue unless matches?
             for word in matches
-              @wordList[word] ?= []
-              @wordList.push(new WordNode {word: word, buffer: null, row: 0})
+              @addWord(word, null, 0)
 
   replaceSelectedTextWithMatch: (matched) ->
     selection = @editor.getLastSelection()
@@ -143,23 +156,39 @@ module.exports =
 
     {prefix, suffix}
 
+  getMatchingWordsIn: (list, prefix, suffix, testCase) ->
+    if testCase
+      if atom.config.get('inline-autocomplete.suggestClosest')
+        {prefix, suffix, word} for {word} in list when testCase(word)
+      else
+        {prefix, suffix, word} for word in list when testCase(word)
+    else
+      if atom.config.get('inline-autocomplete.suggestClosest')
+        {prefix, suffix, word} for {word} in list
+      else
+        {prefix, suffix, word} for word in list
+
+
   findMatchesForCurrentSelection: ->
     selection = @editor.getLastSelection()
     {prefix, suffix} = @prefixAndSuffixOfSelection(selection)
     currentWord = new WordNode word: prefix + @editor.getSelectedText() + suffix, buffer: @editor.getBuffer(), row: @editor.getCursorBufferPosition().row
     currentRow = @editor.getCursorBufferPosition().row
+    regex = new RegExp("^#{prefix}.+#{suffix}$", atom.config.get('inline-autocomplete.regexFlags'))
 
     if (prefix.length + suffix.length) > 0
-      regex = new RegExp("^#{prefix}.+#{suffix}$", atom.config.get('inline-autocomplete.regexFlags'))
-      closestWords = _.uniq(
-        _.sortBy @wordList, (wordN) => currentWord.distanceFrom(wordN)
-        (wordN) -> wordN.word
-        true
-      )
+      if atom.config.get('inline-autocomplete.suggestClosest')
+        closestWords = _.uniq(
+          _.sortBy @wordList, (wordN) => currentWord.distanceFrom(wordN)
+          (wordN) -> wordN.word
+          true
+        )
+      else
+        closestWords = Array.from(@wordList)
 
-      {prefix, suffix, word} for {word} in closestWords when regex.test(word) and word != currentWord.word
+      @getMatchingWordsIn(closestWords, prefix, suffix, (w) => regex.test(w) and w != currentWord.word )
     else
-      {word, prefix, suffix} for {word} in @wordList
+      @getMatchingWordsIn(@wordList, prefix, suffix)
 
   cycleAutocompleteWords: (steps)->
     unless @wordList?
