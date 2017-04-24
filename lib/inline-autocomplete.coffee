@@ -1,9 +1,13 @@
 _ = require 'underscore-plus'
 {Disposable, CompositeDisposable, Range} = require 'atom'
 {$, $$} = require 'atom-space-pen-views'
+WordNode = require './word-node'
 
 module.exports =
   config:
+    suggestClosest:
+      type: 'boolean'
+      default: false
     includeCompletionsFromAllBuffers:
       type: 'boolean'
       default: false
@@ -24,26 +28,37 @@ module.exports =
   editor         : null
   currentBuffer  : null
   editorView     : null
+  deactivationDisposables: null
 
   activate: ->
+    @deactivationDisposables = new CompositeDisposable
+
     # Should I cache this or will coffeescript do it for me?
     confirmKeys = @updateConfirmKeys atom.config.get('inline-autocomplete.confirmKeys')
-    atom.workspace.observeTextEditors (editor) =>
+    @deactivationDisposables.add atom.workspace.observeTextEditors (editor) =>
       editorView = atom.views.getView editor
       editorView.onkeydown = (e) =>
-        @reset() if (e.keyCode in confirmKeys) and editorView and editorView.classList.contains('inline-autocompleting')
+        @reset() unless (e.keyCode in confirmKeys) and editorView and editorView.classList.contains('inline-autocompleting')
+
+      disposable = new Disposable => @reset()
+      @deactivationDisposables.add editor.onDidDestroy -> disposable.dispose()
+      @deactivationDisposables.add disposable
 
     # Clicking anywhere should reset autocomplete
     atom.views.getView(atom.workspace).onclick = (e) =>
-        @reset() if @editorView? and @editorView.classList.contains('inline-autocompleting')
-    atom.commands.add 'inline-autocompleting', 'inline-autocomplete:stop', (e) =>
+      @reset() if @editorView? and @editorView.classList.contains('inline-autocompleting')
+
+    @deactivationDisposables.add atom.commands.add 'inline-autocompleting', 'inline-autocomplete:stop', (e) =>
       @reset()
 
-    atom.commands.add 'atom-workspace', 'inline-autocomplete:cycle-back', (e) =>
+    @deactivationDisposables.add atom.commands.add 'atom-workspace', 'inline-autocomplete:cycle-back', (e) =>
       @toggleAutocomplete(e, -1)
 
-    atom.commands.add 'atom-workspace', 'inline-autocomplete:cycle', (e) =>
+    @deactivationDisposables.add atom.commands.add 'atom-workspace', 'inline-autocomplete:cycle', (e) =>
       @toggleAutocomplete(e, 1)
+
+    deactive: ->
+      @deactivationDisposables.dispose()
 
   # Removes any already binded keys
   # TODO: figure out a better way to handle this for keys with modifiers
@@ -76,14 +91,32 @@ module.exports =
       @reset()
       e.abortKeyBinding()
 
+  initalizeList: ->
+    if atom.config.get('inline-autocomplete.suggestClosest')
+      @wordList = []
+    else
+      @wordList = new Set()
+
+  addWord: (word, buffer, row) ->
+    if atom.config.get('inline-autocomplete.suggestClosest')
+      @wordList.push(new WordNode {word: word, buffer: buffer, row: row+1})
+    else
+      @wordList.add(word)
+
   buildWordList: ->
-    wordMap = {}
+    @initalizeList()
     if atom.config.get('inline-autocomplete.includeCompletionsFromAllBuffers')
       buffers = atom.project.getBuffers()
     else
       buffers = [@currentBuffer]
 
-    matches = (buffer.getText().match(@wordRegex) for buffer in buffers)
+    for buffer in buffers
+      for line, row in buffer.getLines()
+        matches = line.match(@wordRegex)
+        continue unless matches?
+        for validWord in matches
+          @addWord(validWord, buffer, row)
+
     # Really goddamn ugly code here, it just strips out the match string of special characters
     # It's probably pretty damn inefficent and unreliable
     if atom.config.get('inline-autocomplete.includeGrammarKeywords')
@@ -91,23 +124,20 @@ module.exports =
       if grammar and grammar.rawPatterns
         for rawPattern in grammar.rawPatterns
           if rawPattern.match
-            strippedPattern = rawPattern.match.replace(/\\.{1}/g, '')
-            if words = strippedPattern.match(/\w+/g)
-              matches.push(word.match(@wordRegex)) if word.match(@wordRegex) for word in words
+            strippedPattern = rawPattern.match.replace(/\\.{2}/g, '')
+            matches = strippedPattern.match(@wordRegex)
+            continue unless matches?
+            for word in matches
+              @addWord(word, null, 0)
 
-    wordMap[word] ?= true for word in _.flatten(matches)
-
-    @wordList = Object.keys(wordMap).sort (word1, word2) ->
-      word1.toLowerCase().localeCompare(word2.toLowerCase())
-
-  replaceSelectedTextWithMatch: (match) ->
+  replaceSelectedTextWithMatch: (matched) ->
     selection = @editor.getLastSelection()
     startPosition = selection.getBufferRange().start
     buffer = @editor.getBuffer()
 
     selection.selectWord()
-    selection.insertText(match.word, { select: false })
-    # selection.insertText(match.word, { select: false, undo: 'skip' })
+    selection.insertText(matched.word, { select: false })
+    # selection.insertText(matched.word, { select: false, undo: 'skip' })
 
   prefixAndSuffixOfSelection: (selection) ->
     selectionRange = selection.getBufferRange()
@@ -126,17 +156,39 @@ module.exports =
 
     {prefix, suffix}
 
+  getMatchingWordsIn: (list, prefix, suffix, testCase) ->
+    if testCase
+      if atom.config.get('inline-autocomplete.suggestClosest')
+        {prefix, suffix, word} for {word} in list when testCase(word)
+      else
+        {prefix, suffix, word} for word in list when testCase(word)
+    else
+      if atom.config.get('inline-autocomplete.suggestClosest')
+        {prefix, suffix, word} for {word} in list
+      else
+        {prefix, suffix, word} for word in list
+
+
   findMatchesForCurrentSelection: ->
     selection = @editor.getLastSelection()
     {prefix, suffix} = @prefixAndSuffixOfSelection(selection)
+    currentWord = new WordNode word: prefix + @editor.getSelectedText() + suffix, buffer: @editor.getBuffer(), row: @editor.getCursorBufferPosition().row
+    currentRow = @editor.getCursorBufferPosition().row
+    regex = new RegExp("^#{prefix}.+#{suffix}$", atom.config.get('inline-autocomplete.regexFlags'))
 
     if (prefix.length + suffix.length) > 0
-      regex = new RegExp("^#{prefix}.+#{suffix}$", atom.config.get('inline-autocomplete.regexFlags'))
-      currentWord = prefix + @editor.getSelectedText() + suffix
-      for word in @wordList when regex.test(word) and word != currentWord
-        {prefix, suffix, word}
+      if atom.config.get('inline-autocomplete.suggestClosest')
+        closestWords = _.uniq(
+          _.sortBy @wordList, (wordN) => currentWord.distanceFrom(wordN)
+          (wordN) -> wordN.word
+          true
+        )
+      else
+        closestWords = Array.from(@wordList)
+
+      @getMatchingWordsIn(closestWords, prefix, suffix, (w) => regex.test(w) and w != currentWord.word )
     else
-      {word, prefix, suffix} for word in @wordList
+      @getMatchingWordsIn(@wordList, prefix, suffix)
 
   cycleAutocompleteWords: (steps)->
     unless @wordList?

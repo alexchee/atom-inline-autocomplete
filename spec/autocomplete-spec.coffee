@@ -1,57 +1,63 @@
 {GitRepository} = require 'atom'
 {$, EditorView, WorkspaceView} = require 'atom-space-pen-views'
-AutocompleteView = require '../lib/autocomplete-view'
-Autocomplete = require '../lib/autocomplete'
+Autocomplete = require '../lib/inline-autocomplete'
 
 describe "Autocomplete", ->
-  [activationPromise] = []
+  [workspaceElement, activationPromise] = []
 
   beforeEach ->
-    atom.workspaceView = new WorkspaceView
-    atom.workspaceView.openSync('sample.js')
-    atom.workspaceView.simulateDomAttachment()
-    activationPromise = atom.packages.activatePackage('autocomplete')
+    waitsForPromise ->
+      atom.workspace.open('sample.js')
+    # atom.workspaceView.simulateDomAttachment()
+    runs ->
+      workspaceElement = atom.views.getView(atom.workspace)
+      jasmine.attachToDOM(workspaceElement)
+      activationPromise = atom.packages.activatePackage('inline-autocomplete')
 
   describe "@activate()", ->
-    it "activates autocomplete on all existing and future editors (but not on autocomplete's own mini editor)", ->
-      spyOn(AutocompleteView.prototype, 'initialize').andCallThrough()
+    it "activates autocomplete on all existing and future editors", ->
+      atom.workspace.getActivePane().splitRight(copyActiveItem: true)
+      [leftEditorElement, rightEditorElement] = workspaceElement.querySelectorAll('atom-text-editor')
 
-      expect(AutocompleteView.prototype.initialize).not.toHaveBeenCalled()
-
-      leftEditor = atom.workspaceView.getActiveView()
-      rightEditor = leftEditor.splitRight()
-
-      leftEditor.trigger 'autocomplete:toggle'
+      atom.commands.dispatch leftEditorElement, 'inline-autocomplete:cycle'
 
       waitsForPromise ->
         activationPromise
 
+      waits()
+
       runs ->
-        expect(leftEditor.find('.autocomplete')).toExist()
-        expect(rightEditor.find('.autocomplete')).not.toExist()
-        expect(AutocompleteView.prototype.initialize).toHaveBeenCalled()
+        expect(leftEditorElement.querySelector('.inline-autocompleting')).toExist()
+        expect(rightEditorElement.querySelector('.inline-autocompleting')).not.toExist()
 
-        autoCompleteView = leftEditor.find('.autocomplete').view()
-        autoCompleteView.trigger 'core:cancel'
-        expect(leftEditor.find('.autocomplete')).not.toExist()
+        # atom.commands.dispatch leftEditorElement, 'inline-autocomplete:stop'
+        atom.commands.dispatch leftEditorElement.querySelector('.inline-autocompleting'), 'inline-autocomplete:stop'
 
-        rightEditor.trigger 'autocomplete:toggle'
-        expect(rightEditor.find('.autocomplete')).toExist()
+      waits()
+
+      runs ->
+        expect(leftEditorElement.querySelector('.inline-autocompleting')).not.toExist()
+        atom.commands.dispatch rightEditorElement, 'inline-autocomplete:cycle'
+
+      waits()
+
+      runs ->
+        expect(rightEditorElement.querySelector('.inline-autocompleting')).toExist()
 
   describe "@deactivate()", ->
     it "removes all autocomplete views and doesn't create new ones when new editors are opened", ->
-      atom.workspaceView.getActiveView().trigger "autocomplete:toggle"
+      atom.workspace.getActivePane().trigger "inline-autocomplete:cycle"
 
       waitsForPromise ->
         activationPromise
 
       runs ->
-        expect(atom.workspaceView.getActiveView().find('.autocomplete')).toExist()
+        expect(atom.workspace.getActivePane().find('.autocomplete')).toExist()
         atom.packages.deactivatePackage('autocomplete')
-        expect(atom.workspaceView.getActiveView().find('.autocomplete')).not.toExist()
-        atom.workspaceView.getActiveView().splitRight()
-        atom.workspaceView.getActiveView().trigger "autocomplete:toggle"
-        expect(atom.workspaceView.getActiveView().find('.autocomplete')).not.toExist()
+        expect(atom.workspace.getActivePane().find('.autocomplete')).not.toExist()
+        atom.workspace.getActivePane().splitRight()
+        atom.workspace.getActivePane().trigger "inline-autocomplete:cycle"
+        expect(atom.workspace.getActivePane().find('.autocomplete')).not.toExist()
 
 describe "AutocompleteView", ->
   [autocomplete, editorView, editor, miniEditor] = []
@@ -357,6 +363,7 @@ describe "AutocompleteView", ->
 
         miniEditor.textInput('o')
         window.advanceClock(autocomplete.inputThrottle)
+        expect(editorView.classList).toContain('inline-autocompleting')
         expect(autocomplete.list.find('li').length).toBe 2
         expect(autocomplete.list.find('li:eq(0)')).toHaveText 'pivot'
         expect(autocomplete.list.find('li:eq(1)')).toHaveText 'quicksort'
@@ -385,6 +392,8 @@ describe "AutocompleteView", ->
       editorView.focus()
 
       expect(autocomplete.cancel).toHaveBeenCalled()
+      expect(editorView.classList).not.toContain('inline-autocompleting')
+
 
   describe ".attach()", ->
     beforeEach ->
