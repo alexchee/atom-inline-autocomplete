@@ -79,7 +79,7 @@ module.exports =
       cursor = @editor.getLastCursor()
       cursorPosition = @editor.getCursorBufferPosition()
 
-      if @editorView and cursor.isVisible() and
+      if @editorView and
       @currentBuffer.getTextInRange( Range.fromPointWithDelta(cursorPosition,0,-1)).match(/^\w$/) and
       @currentBuffer.getTextInRange( Range.fromPointWithDelta(cursorPosition,0,1)).match(/^\W*$/)
         @editorView.classList.add('inline-autocompleting')
